@@ -5,9 +5,9 @@
  * reserva) e grava o resultado nas abas Inconsistencias e Varreduras.
  *
  * Funcoes que voce executa:
- *   executarVarredura()            -> roda a varredura (usada tambem pelo gatilho)
- *   ativarVarreduraAutomatica()    -> cria o gatilho periodico
- *   desativarVarreduraAutomatica() -> remove o gatilho
+ *   executarVarredura()   -> roda a varredura (usada tambem pelo gatilho)
+ *   ativarAutomacoes()    -> cria os gatilhos (varredura periodica e acoes do app)
+ *   desativarAutomacoes() -> remove os gatilhos
  */
 
 const VARREDURA = {
@@ -36,9 +36,10 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Monitor de Integridade')
     .addItem('Executar varredura agora', 'executarVarreduraManual')
+    .addItem('Processar ações pendentes', 'processarAcoesManual')
     .addSeparator()
-    .addItem('Ativar varredura automática', 'ativarVarreduraAutomatica')
-    .addItem('Desativar varredura automática', 'desativarVarreduraAutomatica')
+    .addItem('Ativar automações', 'ativarAutomacoes')
+    .addItem('Desativar automações', 'desativarAutomacoes')
     .addSeparator()
     .addItem('Recriar bases fictícias', 'criarBasesFicticias')
     .addToUi();
@@ -55,26 +56,31 @@ function executarVarreduraManual() {
   );
 }
 
-// ---------- Gatilho periodico ----------
+// ---------- Gatilhos ----------
+// executarVarredura: de hora em hora
+// aoAlterarPlanilha: quando a planilha muda (ex.: botao clicado no AppSheet)
+// processarAcoes:    a cada minuto, como garantia caso o gatilho de mudanca nao dispare
 
-function ativarVarreduraAutomatica() {
+const FUNCOES_COM_GATILHO = ['executarVarredura', 'processarAcoes', 'aoAlterarPlanilha'];
+
+function ativarAutomacoes() {
   removerGatilhos_();
-  ScriptApp.newTrigger('executarVarredura')
-    .timeBased()
-    .everyHours(VARREDURA.intervaloHoras)
-    .create();
-  SpreadsheetApp.getActiveSpreadsheet().toast(
-    'Varredura automática ativada (a cada ' + VARREDURA.intervaloHoras + 'h).');
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ScriptApp.newTrigger('executarVarredura').timeBased().everyHours(VARREDURA.intervaloHoras).create();
+  ScriptApp.newTrigger('processarAcoes').timeBased().everyMinutes(1).create();
+  ScriptApp.newTrigger('aoAlterarPlanilha').forSpreadsheet(ss).onChange().create();
+  ss.toast('Automações ativadas: varredura a cada ' + VARREDURA.intervaloHoras +
+    'h e processamento das ações do app.');
 }
 
-function desativarVarreduraAutomatica() {
+function desativarAutomacoes() {
   removerGatilhos_();
-  SpreadsheetApp.getActiveSpreadsheet().toast('Varredura automática desativada.');
+  SpreadsheetApp.getActiveSpreadsheet().toast('Automações desativadas.');
 }
 
 function removerGatilhos_() {
   ScriptApp.getProjectTriggers().forEach(function (g) {
-    if (g.getHandlerFunction() === 'executarVarredura') ScriptApp.deleteTrigger(g);
+    if (FUNCOES_COM_GATILHO.indexOf(g.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(g);
   });
 }
 
@@ -91,7 +97,7 @@ function executarVarredura() {
   try {
     const registros = lerBases_(ss);
     const achados = detectarInconsistencias_(registros);
-    const sync = sincronizarInconsistencias_(ss, achados, id, inicio);
+    const sync = sincronizarInconsistencias_(ss, achados, registros, id, inicio);
     registrarVarredura_(ss, id, inicio, registros.length, sync.ativos, 'Sucesso');
     return {
       id: id,
@@ -244,7 +250,8 @@ function detectarInconsistencias_(registros) {
       basesAusentes.forEach(function (b) {
         achados.push({
           base: b, registroId: '', matricula: ref.campos.Matricula, cpf: formatarCpf_(chave),
-          tipo: TIPO.AUSENTE, campo: 'Registro', valorAtual: '', sugerido: '',
+          tipo: TIPO.AUSENTE, campo: 'Registro', valorAtual: '',
+          sugerido: 'Criar cadastro com os dados de ' + basesPresentes[0],
           detalhe: (ref.campos.Nome || 'Colaborador') + ' existe em ' + basesPresentes.join(', ') +
             ' mas não em ' + b + '.',
         });
@@ -256,10 +263,14 @@ function detectarInconsistencias_(registros) {
 }
 
 // ---------- Sincronizacao com a aba Inconsistencias ----------
-// Nao duplica o que ja esta pendente, respeita o que foi ignorado e
-// marca como corrigido o que deixou de aparecer.
+// Nao duplica o que ja esta pendente, respeita o que foi ignorado ou esta
+// em processamento, e fecha o que deixou de aparecer: "Excluido" se o
+// registro sumiu da base, "Corrigido" se o registro continua la sem o problema.
 
-function sincronizarInconsistencias_(ss, achados, varreduraId, agora) {
+function sincronizarInconsistencias_(ss, achados, registros, varreduraId, agora) {
+  const existentes = {};
+  registros.forEach(function (r) { existentes[r.base + '|' + r.id] = true; });
+
   const aba = ss.getSheetByName(VARREDURA.abaInconsistencias);
   if (!aba) throw new Error('Aba não encontrada: ' + VARREDURA.abaInconsistencias);
   const nCols = aba.getLastColumn();
@@ -282,7 +293,7 @@ function sincronizarInconsistencias_(ss, achados, varreduraId, agora) {
   dados.forEach(function (l, i) {
     const status = txt_(l[c.Status]);
     if (status === 'Pendente') pendentes[chaveLinha(l)] = i;
-    else if (status === 'Ignorado') ignorados[chaveLinha(l)] = true;
+    else if (status === 'Ignorado' || status === 'Em processamento') ignorados[chaveLinha(l)] = true;
   });
 
   const vistos = {};
@@ -325,7 +336,9 @@ function sincronizarInconsistencias_(ss, achados, varreduraId, agora) {
   Object.keys(pendentes).forEach(function (k) {
     if (vistos[k]) return;
     const l = dados[pendentes[k]];
-    l[c.Status] = 'Corrigido';
+    const registroId = txt_(l[c.Registro_ID]);
+    const sumiu = registroId && !existentes[txt_(l[c.Base]) + '|' + registroId];
+    l[c.Status] = sumiu ? 'Excluido' : 'Corrigido';
     l[c.Resolvido_Em] = agora;
     l[c.Resolvido_Por] = 'Varredura automática';
     resolvidas++;
