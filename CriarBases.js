@@ -19,7 +19,7 @@ const CABECALHO_BASE = ['ID', 'Matricula', 'CPF', 'Nome', 'Email', 'Setor', 'Atu
 const CABECALHO_INCONSISTENCIAS = [
   'ID', 'Varredura_ID', 'Data_Deteccao', 'Base', 'Registro_ID', 'Matricula', 'CPF',
   'Tipo', 'Campo', 'Valor_Atual', 'Valor_Sugerido', 'Detalhe',
-  'Status', 'Resolvido_Em', 'Resolvido_Por',
+  'Status', 'Resolvido_Em', 'Resolvido_Por', 'Acao_Solicitada', 'Novo_Valor',
 ];
 
 const CABECALHO_VARREDURAS = [
