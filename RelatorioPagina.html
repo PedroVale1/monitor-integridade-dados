@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fundo: #F2F3F1;
+    --papel: #FFFFFF;
+    --tinta: #2A1E17;
+    --suave: #6E625A;
+    --linha: #DCD7D2;
+    --marca: #C4161C;
+    --pendente: #D08A1E;
+    --corrigido: #2F7D57;
+    --alterado: #2C6AA6;
+    --excluido: #8C4A3C;
+    --ignorado: #A9A29C;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--fundo);
+    color: var(--tinta);
+    font-family: 'Archivo', 'Segoe UI', Roboto, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+  }
+  main { max-width: 1040px; margin: 0 auto; padding: 40px 24px 56px; }
+
+  .topo { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap;
+    border-bottom: 3px solid var(--marca); padding-bottom: 12px; }
+  .topo .produto { font-weight: 700; font-stretch: 110%; }
+  .topo .ambiente { color: var(--suave); font-size: 0.9rem; }
+
+  h1 {
+    font-size: clamp(2rem, 5.4vw, 3.5rem);
+    font-stretch: 78%;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    margin: 36px 0 12px;
+    max-width: 18ch;
+  }
+  .resumo { color: var(--suave); max-width: 62ch; margin: 0; }
+  .alerta { color: var(--marca); font-weight: 600; }
+
+  h2 { font-size: 1.15rem; font-weight: 700; font-stretch: 105%; margin: 0 0 14px; }
+  section { margin-top: 44px; }
+
+  /* Faixa de situacao: o elemento central do relatorio */
+  .faixa { display: flex; height: 44px; border-radius: 6px; overflow: hidden; background: var(--linha); }
+  .faixa span { display: block; height: 100%; }
+  .corrigido { background: var(--corrigido); }
+  .alterado { background: var(--alterado); }
+  .excluido { background: var(--excluido); }
+  .ignorado { background: var(--ignorado); }
+  .pendente { background: var(--pendente); }
+
+  .legenda { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px 20px; margin: 16px 0 0; padding: 0; list-style: none; }
+  .legenda li { border-top: 4px solid; padding-top: 8px; }
+  .legenda li.corrigido, .legenda li.alterado, .legenda li.excluido, .legenda li.ignorado, .legenda li.pendente { background: none; }
+  .legenda li.corrigido { border-color: var(--corrigido); }
+  .legenda li.alterado { border-color: var(--alterado); }
+  .legenda li.excluido { border-color: var(--excluido); }
+  .legenda li.ignorado { border-color: var(--ignorado); }
+  .legenda li.pendente { border-color: var(--pendente); }
+  .legenda strong { display: block; font-size: 1.9rem; font-weight: 700; font-stretch: 85%; line-height: 1.1; }
+  .legenda span { color: var(--suave); font-size: 0.92rem; }
+
+  .colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+  table { width: 100%; border-collapse: collapse; background: var(--papel); border-radius: 6px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--linha); vertical-align: middle; }
+  th { font-size: 0.85rem; color: var(--suave); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  td.fixo { white-space: nowrap; }
+  .barra { display: flex; height: 10px; min-width: 120px; background: var(--fundo); border-radius: 5px; overflow: hidden; }
+  .barra span { display: block; height: 100%; }
+  .rolagem { overflow-x: auto; border-radius: 6px; }
+
+  .selo { display: inline-block; padding: 2px 10px; border-radius: 999px; color: #fff; font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
+  .vazio { background: var(--papel); border-radius: 6px; padding: 18px 20px; color: var(--suave); margin: 0; }
+  footer { margin-top: 48px; color: var(--suave); font-size: 0.88rem; border-top: 1px solid var(--linha); padding-top: 14px; }
+
+  @media (max-width: 760px) {
+    .colunas { grid-template-columns: 1fr; gap: 0; }
+    .legenda { grid-template-columns: repeat(2, 1fr); }
+    main { padding: 24px 16px 40px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="topo">
+    <span class="produto">Monitor de Integridade de Dados</span>
+    <? if (d.ambiente) { ?><span class="ambiente">Ambiente de <?= d.ambiente ?></span><? } ?>
+  </div>
+
+  <? if (!d.ultima) { ?>
+    <h1>Nenhuma varredura registrada</h1>
+    <p class="resumo">Abra a planilha e use o menu Monitor de Integridade &gt; Executar varredura agora. Depois, atualize esta página.</p>
+  <? } else { ?>
+
+  <h1><?= d.titulo ?></h1>
+  <p class="resumo">
+    Última varredura em <?= d.ultima.quando ?>, com <?= d.ultima.registros ?> cadastros analisados em <?= d.ultima.duracao ?> s.
+    <? if (!d.ultima.sucesso) { ?><span class="alerta">A última execução terminou com falha: <?= d.ultima.status ?></span><? } ?>
+  </p>
+
+  <section aria-labelledby="t-situacao">
+    <h2 id="t-situacao">Situação das <?= d.total ?> inconsistências encontradas desde o início do monitoramento</h2>
+    <? if (d.total === 0) { ?>
+      <p class="vazio">Nenhuma inconsistência foi encontrada nas bases até agora.</p>
+    <? } else { ?>
+      <div class="faixa" role="img" aria-label="<?= d.percentualTratado ?>% das inconsistências já foram tratadas">
+        <? d.faixas.forEach(function (f) { if (f.n > 0) { ?><span class="<?= f.chave ?>" style="width: <?= f.pct ?>%" title="<?= f.rotulo ?>: <?= f.n ?>"></span><? } }); ?>
+      </div>
+      <ul class="legenda">
+        <? d.faixas.forEach(function (f) { ?>
+          <li class="<?= f.chave ?>"><strong><?= f.n ?></strong><span><?= f.rotulo ?></span></li>
+        <? }); ?>
+      </ul>
+    <? } ?>
+  </section>
+
+  <section class="colunas">
+    <div>
+      <h2>Por base de origem</h2>
+      <table>
+        <thead><tr><th>Base</th><th>Tratadas e pendentes</th><th class="num">Pendentes</th></tr></thead>
+        <tbody>
+        <? d.porBase.forEach(function (b) { ?>
+          <tr>
+            <td><?= b.base ?></td>
+            <td><div class="barra" title="<?= b.tratadas ?> tratadas, <?= b.pendentes ?> pendentes"><span class="corrigido" style="width: <?= b.pctTratadas ?>%"></span><span class="pendente" style="width: <?= b.pctPendentes ?>%"></span></div></td>
+            <td class="num"><?= b.pendentes ?></td>
+          </tr>
+        <? }); ?>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h2>Pendências por tipo de problema</h2>
+      <? if (d.porTipo.length === 0) { ?>
+        <p class="vazio">Não há pendências no momento.</p>
+      <? } else { ?>
+      <table>
+        <thead><tr><th>Problema</th><th></th><th class="num">Pendentes</th></tr></thead>
+        <tbody>
+        <? d.porTipo.forEach(function (t) { ?>
+          <tr>
+            <td><?= t.tipo ?></td>
+            <td><div class="barra"><span class="pendente" style="width: <?= t.pct ?>%"></span></div></td>
+            <td class="num"><?= t.pendentes ?></td>
+          </tr>
+        <? }); ?>
+        </tbody>
+      </table>
+      <? } ?>
+    </div>
+  </section>
+
+  <section aria-labelledby="t-decisoes">
+    <h2 id="t-decisoes">Decisões mais recentes</h2>
+    <? if (d.decisoes.length === 0) { ?>
+      <p class="vazio">Nenhuma inconsistência foi tratada ainda. As decisões tomadas no app aparecem aqui.</p>
+    <? } else { ?>
+    <div class="rolagem">
+    <table>
+      <thead><tr><th>Quando</th><th>Base</th><th>Cadastro</th><th>Problema</th><th>Campo</th><th>Decisão</th><th>Responsável</th></tr></thead>
+      <tbody>
+      <? d.decisoes.forEach(function (x) { ?>
+        <tr>
+          <td class="fixo"><?= x.quando ?></td>
+          <td><?= x.base ?></td>
+          <td class="fixo"><?= x.registro ?></td>
+          <td><?= x.tipo ?></td>
+          <td><?= x.campo ?></td>
+          <td><span class="selo <?= x.status.toLowerCase() ?>"><?= x.rotuloStatus ?></span></td>
+          <td><?= x.por ?></td>
+        </tr>
+      <? }); ?>
+      </tbody>
+    </table>
+    </div>
+    <? } ?>
+  </section>
+
+  <? } ?>
+
+  <footer>Relatório gerado em <?= d.geradoEm ?>. Atualize a página para ver os dados mais recentes.</footer>
+</main>
+</body>
+</html>
